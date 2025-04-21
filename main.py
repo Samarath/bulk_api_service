@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse
 import httpx
 from urllib.parse import urlencode
-from config import CLIENT_ID, REDIRECT_URI, TOKEN_URL, AUTH_URL
+from config import CLIENT_ID, REDIRECT_URI, TOKEN_URL, AUTH_URL, BULK_EXPORT_URL
 
 app = FastAPI()
 
@@ -29,7 +29,6 @@ def launch_auth():
 @app.get("/callback")
 async def handle_callback(request:Request):
     code = request._query_params.get("code")
-    print(code, "******************************************")
     if not code:
         return {"error": "Authorization code not provided."}
 
@@ -42,9 +41,6 @@ async def handle_callback(request:Request):
         }
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
         token_response = await client.post(TOKEN_URL, data=data, headers=headers)
-        print("------------------------------------")
-        print(token_response.status_code, token_response.text)
-        print("------------------------------------")
     if token_response.status_code == 200:
         token_data = token_response.json()
         return {
@@ -53,6 +49,30 @@ async def handle_callback(request:Request):
         }
     else:
         return {"error": token_response.text}
+
+
+@app.post("/export/start")
+async def start_bulk_export(token: str):
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/fhir+json",
+        "Prefer": "respond-async",
+    }
+    params = {
+        "_type": "Patient,Encounter,MedicationRequest,AllergyIntolerance,Observation",
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(BULK_EXPORT_URL, headers=headers, params=params)
+
+    if response.status_code == 202:
+        job_status_url = response.headers.get("Content-Location")
+        if not job_status_url:
+            raise HTTPException(status_code=500, detail="Missing Content-Location header in response.")
+        return {"job_status_url": job_status_url}
+    else:
+        raise HTTPException(status_code=response.status_code, detail=response.text)
+
 
 @app.get("/export/status")
 async def check_bulk_status(job_status_url: str, token: str):
