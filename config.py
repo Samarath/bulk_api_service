@@ -1,0 +1,4 @@
+CLIENT_ID = "b9b452f1-a8cb-473d-a62e-d17d79c866f4"
+REDIRECT_URI = "http://localhost:8000/callback"
+TOKEN_URL = "https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token"
+AUTH_URL = "https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize"
